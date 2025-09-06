@@ -50,4 +50,5 @@ export interface CalculationResults {
   availableTreasury: number; // Trésorerie disponible l'année de revente
   netEnrichment: number; // Enrichissement net à 10 ans
   enrichmentMultiplier: number; // Coefficient d'enrichissement
+  resalePrice: number; // Prix de revente calculé
 }
