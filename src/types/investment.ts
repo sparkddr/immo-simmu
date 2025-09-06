@@ -21,6 +21,9 @@ export interface RentalIncome {
   charges: number; // Charges mensuelles
   vacancy: number; // Taux de vacance (en %)
   management: number; // Frais de gestion (en %)
+  taxeFonciere: number; // Taxe foncière annuelle
+  chargesAnnuelles: number; // Charges annuelles (copropriété, etc.)
+  assuranceProprietaire: number; // Assurance propriétaire annuelle
 }
 
 export interface Projection {

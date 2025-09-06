@@ -61,6 +61,18 @@ export const rentalIncomeSchema = z.object({
     .number()
     .min(0, { message: 'Les frais de gestion ne peuvent être négatifs' })
     .max(30, { message: 'Les frais de gestion ne peuvent excéder 30%' }),
+  taxeFonciere: z
+    .number()
+    .min(0, { message: 'La taxe foncière ne peut être négative' })
+    .max(10000, { message: 'La taxe foncière ne peut excéder 10 000€' }),
+  chargesAnnuelles: z
+    .number()
+    .min(0, { message: 'Les charges annuelles ne peuvent être négatives' })
+    .max(20000, { message: 'Les charges annuelles ne peuvent excéder 20 000€' }),
+  assuranceProprietaire: z
+    .number()
+    .min(0, { message: 'L\'assurance propriétaire ne peut être négative' })
+    .max(5000, { message: 'L\'assurance propriétaire ne peut excéder 5 000€' }),
 });
 
 export const projectionSchema = z.object({

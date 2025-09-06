@@ -40,6 +40,9 @@ const formSchema = z.object({
 
   // Revenus locatifs
   monthlyRent: z.number().min(200).max(10000),
+  taxeFonciere: z.number().min(0).max(10000),
+  chargesAnnuelles: z.number().min(0).max(20000),
+  assuranceProprietaire: z.number().min(0).max(5000),
 
   // Projection
   holdingPeriod: z.number().min(1).max(50),
@@ -60,6 +63,9 @@ export default function InvestmentForm() {
       interestRate: 3.4,
       loanDuration: 20,
       monthlyRent: 800,
+      taxeFonciere: 1200,
+      chargesAnnuelles: 800,
+      assuranceProprietaire: 300,
       holdingPeriod: 10,
       propertyAppreciation: 3.4,
     },
@@ -87,11 +93,18 @@ export default function InvestmentForm() {
     watchedValues.interestRate,
     watchedValues.loanDuration,
   );
-  const monthlyCashFlow = watchedValues.monthlyRent - monthlyPayment;
+  // Calcul des charges mensuelles
+  const monthlyCharges = (watchedValues.taxeFonciere + watchedValues.chargesAnnuelles + watchedValues.assuranceProprietaire) / 12;
+  const netMonthlyRent = watchedValues.monthlyRent - monthlyCharges;
+  const monthlyCashFlow = netMonthlyRent - monthlyPayment;
   const annualCashFlow = monthlyCashFlow * 12;
+  
+  // Rendements
   const grossYield = ((watchedValues.monthlyRent * 12) / totalProjectCost) * 100;
+  const netYield = ((netMonthlyRent * 12) / totalProjectCost) * 100;
 
   // Calculs avancés pour la projection
+  // Prix de revente basé sur le prix d'achat initial (pas le coût total du projet)
   const resalePrice =
     watchedValues.purchasePrice *
     Math.pow(
@@ -143,17 +156,23 @@ export default function InvestmentForm() {
     elapsedYears: number,
   ): number {
     if (principal <= 0 || elapsedYears >= totalYears) return 0;
+    
     const monthlyRate = rate / 100 / 12;
-    const elapsedPayments = elapsedYears * 12;
-    const monthlyPayment = calculateMonthlyPayment(principal, rate, totalYears);
-
-    let balance = principal;
-    for (let i = 0; i < elapsedPayments; i++) {
-      const interestPayment = balance * monthlyRate;
-      const principalPayment = monthlyPayment - interestPayment;
-      balance -= principalPayment;
+    const totalPayments = totalYears * 12;
+    const elapsedPayments = Math.min(elapsedYears * 12, totalPayments);
+    
+    if (monthlyRate === 0) {
+      // Cas sans intérêt
+      return Math.max(0, principal - (principal / totalPayments) * elapsedPayments);
     }
-    return Math.max(0, balance);
+    
+    // Formule directe pour le capital restant dû
+    const remainingBalance = principal * (
+      (Math.pow(1 + monthlyRate, totalPayments) - Math.pow(1 + monthlyRate, elapsedPayments)) /
+      (Math.pow(1 + monthlyRate, totalPayments) - 1)
+    );
+    
+    return Math.max(0, remainingBalance);
   }
 
   function onSubmit(values: FormValues) {
@@ -406,7 +425,7 @@ export default function InvestmentForm() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>
-                      Loyer mensuel: {formatCurrency(field.value)}
+                      Loyer mensuel brut: {formatCurrency(field.value)}
                     </FormLabel>
                     <FormControl>
                       <Slider
@@ -418,6 +437,84 @@ export default function InvestmentForm() {
                         className="w-full"
                       />
                     </FormControl>
+                    <FormDescription>
+                      Loyer hors charges à déduire ci-dessous
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="taxeFonciere"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Taxe foncière annuelle: {formatCurrency(field.value)}
+                    </FormLabel>
+                    <FormControl>
+                      <Slider
+                        min={0}
+                        max={5000}
+                        step={100}
+                        value={[field.value]}
+                        onValueChange={(value) => field.onChange(value[0])}
+                        className="w-full"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="chargesAnnuelles"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Charges annuelles: {formatCurrency(field.value)}
+                    </FormLabel>
+                    <FormControl>
+                      <Slider
+                        min={0}
+                        max={3000}
+                        step={50}
+                        value={[field.value]}
+                        onValueChange={(value) => field.onChange(value[0])}
+                        className="w-full"
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Charges de copropriété, entretien, etc.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="assuranceProprietaire"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Assurance propriétaire annuelle: {formatCurrency(field.value)}
+                    </FormLabel>
+                    <FormControl>
+                      <Slider
+                        min={0}
+                        max={1000}
+                        step={25}
+                        value={[field.value]}
+                        onValueChange={(value) => field.onChange(value[0])}
+                        className="w-full"
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Assurance propriétaire non occupant
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -425,19 +522,30 @@ export default function InvestmentForm() {
 
               <div className="bg-green-50 p-4 rounded-lg space-y-2">
                 <div className="flex justify-between">
+                  <span>Loyer net mensuel:</span>
+                  <span className="font-semibold text-green-600">
+                    {formatCurrency(netMonthlyRent)}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm text-gray-600">
+                  <span>Charges mensuelles totales:</span>
+                  <span>-{formatCurrency(monthlyCharges)}</span>
+                </div>
+                <hr />
+                <div className="flex justify-between">
                   <span>Rendement brut:</span>
                   <span className="font-semibold">
                     {formatPercentage(grossYield)}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Revenus annuels:</span>
-                  <span className="font-semibold">
-                    {formatCurrency(watchedValues.monthlyRent * 12)}
+                  <span>Rendement net:</span>
+                  <span className="font-semibold text-green-700">
+                    {formatPercentage(netYield)}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Cash-flow annuel:</span>
+                  <span>Cash-flow annuel net:</span>
                   <span
                     className={`font-semibold ${
                       annualCashFlow >= 0 ? 'text-green-600' : 'text-red-600'
@@ -556,10 +664,17 @@ export default function InvestmentForm() {
 
               {/* Détails supplémentaires */}
               <div className="bg-gray-50 p-4 rounded-lg space-y-2 text-sm">
+                <div className="font-semibold text-gray-700 mb-2">Détail des calculs :</div>
                 <div className="flex justify-between">
-                  <span>Capital restant dû à la revente:</span>
+                  <span>Prix d&apos;achat initial:</span>
                   <span className="font-semibold">
-                    {formatCurrency(remainingLoan)}
+                    {formatCurrency(watchedValues.purchasePrice)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Prix de revente estimé:</span>
+                  <span className="font-semibold text-blue-600">
+                    {formatCurrency(resalePrice)}
                   </span>
                 </div>
                 <div className="flex justify-between">
@@ -569,11 +684,37 @@ export default function InvestmentForm() {
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span>
-                    Cash-flow total sur {watchedValues.holdingPeriod} ans:
+                  <span>Capital restant dû à la revente:</span>
+                  <span className="font-semibold text-red-600">
+                    -{formatCurrency(remainingLoan)}
                   </span>
-                  <span className="font-semibold">
+                </div>
+                <div className="flex justify-between">
+                  <span>
+                    Cash-flow net cumulé ({watchedValues.holdingPeriod} ans):
+                  </span>
+                  <span className={`font-semibold ${totalCashFlowOverPeriod >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                     {formatCurrency(totalCashFlowOverPeriod)}
+                  </span>
+                </div>
+                <hr className="my-3" />
+                <div className="flex justify-between font-semibold">
+                  <span>Trésorerie disponible:</span>
+                  <span className="text-purple-600">
+                    {formatCurrency(availableTreasury)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Apport personnel initial:</span>
+                  <span className="font-semibold text-orange-600">
+                    -{formatCurrency(watchedValues.personalContribution)}
+                  </span>
+                </div>
+                <hr className="my-3" />
+                <div className="flex justify-between font-semibold text-lg">
+                  <span>Enrichissement net:</span>
+                  <span className={netEnrichment >= 0 ? 'text-green-700' : 'text-red-700'}>
+                    {formatCurrency(netEnrichment)}
                   </span>
                 </div>
               </div>

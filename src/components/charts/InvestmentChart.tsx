@@ -39,19 +39,23 @@ export default function InvestmentChart({
     elapsedYears: number,
   ): number {
     if (principal <= 0 || elapsedYears >= totalYears) return 0;
+    
     const monthlyRate = rate / 100 / 12;
-    const elapsedPayments = elapsedYears * 12;
-    const monthlyPayment =
-      (principal * monthlyRate * Math.pow(1 + monthlyRate, totalYears * 12)) /
-      (Math.pow(1 + monthlyRate, totalYears * 12) - 1);
-
-    let balance = principal;
-    for (let i = 0; i < elapsedPayments; i++) {
-      const interestPayment = balance * monthlyRate;
-      const principalPayment = monthlyPayment - interestPayment;
-      balance -= principalPayment;
+    const totalPayments = totalYears * 12;
+    const elapsedPayments = Math.min(elapsedYears * 12, totalPayments);
+    
+    if (monthlyRate === 0) {
+      // Cas sans intérêt
+      return Math.max(0, principal - (principal / totalPayments) * elapsedPayments);
     }
-    return Math.max(0, balance);
+    
+    // Formule directe pour le capital restant dû
+    const remainingBalance = principal * (
+      (Math.pow(1 + monthlyRate, totalPayments) - Math.pow(1 + monthlyRate, elapsedPayments)) /
+      (Math.pow(1 + monthlyRate, totalPayments) - 1)
+    );
+    
+    return Math.max(0, remainingBalance);
   }
 
   // Générer les données pour le graphique (1 à 30 ans)
